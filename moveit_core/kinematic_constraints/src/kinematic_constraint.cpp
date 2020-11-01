@@ -622,25 +622,40 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
     return ConstraintEvaluationResult(true, 0.0);
 
   Eigen::Vector3d xyz;
+  Eigen::Isometry3d diff;
   if (mobile_frame_)
   {
     // getFrameTransform() returns a valid isometry by contract
     Eigen::Matrix3d tmp = state.getFrameTransform(desired_rotation_frame_id_).linear() * desired_rotation_matrix_;
     // getGlobalLinkTransform() returns a valid isometry by contract
-    Eigen::Isometry3d diff(tmp.transpose() * state.getGlobalLinkTransform(link_model_).linear());  // valid isometry
-    xyz = diff.linear().eulerAngles(0, 1, 2);
-    // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
+    diff = Eigen::Isometry3d(tmp.transpose() * state.getGlobalLinkTransform(link_model_).linear());  // valid isometry
   }
   else
   {
     // diff is valid isometry by construction
-    Eigen::Isometry3d diff(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
-    xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
+    diff = Eigen::Isometry3d(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
   }
 
-  xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::pi<double>() - fabs(xyz(0)));
-  xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::pi<double>() - fabs(xyz(1)));
-  xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::pi<double>() - fabs(xyz(2)));
+  if (parameterization_ == Parameterization::EULER_ANGLES)
+  {
+    xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
+    xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::pi<double>() - fabs(xyz(0)));
+    xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::pi<double>() - fabs(xyz(1)));
+    xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::pi<double>() - fabs(xyz(2)));
+  }
+  else if (parameterization_ == Parameterization::ANGLE_AXIS)
+  {
+    Eigen::AngleAxisd aa(diff.linear());
+    xyz = aa.axis() * aa.angle();
+    xyz(0) = fabs(xyz(0));
+    xyz(1) = fabs(xyz(1));
+    xyz(2) = fabs(xyz(2));
+  }
+  else
+  {
+    // Is it possible for parameterization_ to have an unkown type?
+  }
+
   bool result = xyz(2) < absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
                 xyz(1) < absolute_y_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
                 xyz(0) < absolute_x_axis_tolerance_ + std::numeric_limits<double>::epsilon();
