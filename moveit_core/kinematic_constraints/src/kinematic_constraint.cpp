@@ -555,19 +555,14 @@ bool OrientationConstraint::configure(const moveit_msgs::OrientationConstraint& 
     constraint_weight_ = oc.weight;
   }
 
-  if (oc.parameterization == 0)
-  {
-    parameterization_ = Parameterization::EULER_ANGLES;
-  }
-  else if (oc.parameterization == 1)
-  {
-    parameterization_ = Parameterization::ANGLE_AXIS;
-  }
-  else
+  parameterization_ = oc.parameterization;
+  // validate the parameterization, set to default value if invalid
+  if (parameterization_ != moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES &&
+      parameterization_ != moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
   {
     ROS_WARN_NAMED("kinematic_constraints",
-                   "Unkown parameterization for orientation constraint tolerance, using default (EULER_ANGLES).");
-    parameterization_ = Parameterization::EULER_ANGLES;
+                   "Unkown parameterization for orientation constraint tolerance, using default (XYZ_EULER_ANGLES).");
+    parameterization_ = moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES;
   }
 
   absolute_x_axis_tolerance_ = fabs(oc.absolute_x_axis_tolerance);
@@ -636,14 +631,14 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
     diff = Eigen::Isometry3d(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
   }
 
-  if (parameterization_ == Parameterization::EULER_ANGLES)
+  if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
   {
     xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
     xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::pi<double>() - fabs(xyz(0)));
     xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::pi<double>() - fabs(xyz(1)));
     xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::pi<double>() - fabs(xyz(2)));
   }
-  else if (parameterization_ == Parameterization::ANGLE_AXIS)
+  else if (parameterization_ == moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
   {
     Eigen::AngleAxisd aa(diff.linear());
     xyz = aa.axis() * aa.angle();
