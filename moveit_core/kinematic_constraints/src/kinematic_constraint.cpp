@@ -634,9 +634,9 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
   if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
   {
     xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
-    xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::pi<double>() - fabs(xyz(0)));
-    xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::pi<double>() - fabs(xyz(1)));
-    xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::pi<double>() - fabs(xyz(2)));
+    xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::two_pi<double>() - fabs(xyz(0)));
+    xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::two_pi<double>() - fabs(xyz(1)));
+    xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::two_pi<double>() - fabs(xyz(2)));
   }
   else if (parameterization_ == moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
   {
@@ -652,7 +652,7 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
     ROS_ERROR_STREAM_NAMED("kinematic_constraints",
                            "The parameterization type for the orientation constraints is invalid.");
   }
-
+  
   bool result = xyz(2) < absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
                 xyz(1) < absolute_y_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
                 xyz(0) < absolute_x_axis_tolerance_ + std::numeric_limits<double>::epsilon();
