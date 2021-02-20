@@ -266,6 +266,91 @@ void EqualityPositionConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd
   }
 }
 
+  /******************************************
+ * Linear System constraints
+ * ****************************************/
+LinearSystemPositionConstraint::LinearSystemPositionConstraint(const robot_model::RobotModelConstPtr& robot_model,
+                                                       const std::string& group, const unsigned int num_dofs)
+  : BaseConstraint(robot_model, group, num_dofs)
+{
+}
+
+void LinearSystemPositionConstraint::parseConstraintMsg(const moveit_msgs::Constraints& constraints)
+{
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Parsing linear system position constraint for OMPL constrained state space.");
+  // bounds_.clear();
+
+  std::vector<double> dims = constraints.position_constraints.at(0).constraint_region.primitives.at(0).dimensions;
+
+  is_dim_constrained_ = { false, false, false };
+  for (std::size_t i{ 0 }; i < dims.size(); ++i)
+  {
+    if (dims[i] < EQUALITY_CONSTRAINT_THRESHOLD_)
+    {
+      if (dims[i] < getTolerance())
+      {
+        ROS_ERROR_NAMED(
+            LOGNAME,
+            "Dimension %li of position constraint is smaller than the tolerance used to evaluate the constraints. "
+            "This will make all states invalid and planning will fail :( Please use a value between %f and %f. ",
+            i, getTolerance(), EQUALITY_CONSTRAINT_THRESHOLD_);
+      }
+      is_dim_constrained_.at(i) = true;
+    }
+  }
+
+  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on x-position? " << (is_dim_constrained_[0] ? "yes" : "no"));
+  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on y-position? " << (is_dim_constrained_[1] ? "yes" : "no"));
+  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on z-position? " << (is_dim_constrained_[2] ? "yes" : "no"));
+
+  // extract target position and orientation
+  geometry_msgs::Point position =
+      constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
+  start_position_ << position.x, position.y, position.z;
+  position =
+      constraints.position_constraints.at(0).constraint_region.primitive_poses.at(1).position;
+  end_position_ << position.x, position.y, position.z;
+  tf2::fromMsg(constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).orientation,
+                           target_orientation_);
+
+  link_name_ = constraints.position_constraints.at(0).link_name;
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Position constraints applied to link: " << link_name_);
+}
+
+void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                          Eigen::Ref<Eigen::VectorXd> out) const
+{
+  // Eigen::Vector3d cartesianPosition = target_orientation_.matrix().transpose() * forwardKinematics(joint_values).translation();
+  Eigen::Vector3d cartesianPosition = forwardKinematics(joint_values).translation();
+  Eigen::Vector2d residual;
+  residual[0] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
+  residual[1] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
+  out = residual;
+  out[3] = 0.0;  // unbounded dimension
+}
+
+
+// void LinearSystemPositionConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+//                                           Eigen::Ref<Eigen::MatrixXd> out) const
+// {
+//   out.setZero();
+//   Eigen::MatrixXd jac = target_orientation_.matrix().transpose() * robotGeometricJacobian(joint_values).topRows(3);
+//   Eigen::MatrixXd dresidual_dcartesianPosition;
+//   // d residual[0] / d x
+//   dresidual_dcartesianPosition[0,0] = start_position_.y() - end_position_.y();
+//   // d residual[1] / d x
+//   dresidual_dcartesianPosition[1,0] = 0;
+//   // d residual[0] / d y
+//   dresidual_dcartesianPosition[0,1] = end_position_.x() - start_position_.x();
+//   // d residual[1] / d y
+//   dresidual_dcartesianPosition[1,1] = start_position_.z() - end_position_.z();
+//   // d residual[0] / d z
+//   dresidual_dcartesianPosition[0,1] = 0;
+//   // d residual[1] / d z
+//   dresidual_dcartesianPosition[1,1] = end_position_.y() - start_position_.y();
+//   out = dresidual_dcartesianPosition * jac;
+// }
+
 /************************************
  * MoveIt constraint message parsing
  * **********************************/
@@ -320,6 +405,11 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
     {
       ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using equality position constraints.");
       pos_con = std::make_shared<EqualityPositionConstraint>(robot_model, group, num_dofs);
+    }
+    else if (constraints.name == "linear_system_constraints")
+    {
+      ROS_INFO_STREAM("Using position constraints from a linear system.");
+      pos_con = std::make_shared<LinearSystemPositionConstraint>(robot_model, group, num_dofs);
     }
     else
     {
