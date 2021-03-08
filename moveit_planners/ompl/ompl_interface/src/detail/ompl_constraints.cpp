@@ -36,9 +36,6 @@
 
 #include <moveit/ompl_interface/detail/ompl_constraints.h>
 
-#include <moveit/ompl_interface/detail/threadsafe_state_storage.h>
-#include <moveit/robot_model/robot_model.h>
-#include <moveit_msgs/Constraints.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 namespace ompl_interface
@@ -143,17 +140,17 @@ void BaseConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_val
   out = bounds_.penalty(current_values);
 }
 
-void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-                              Eigen::Ref<Eigen::MatrixXd> out) const
-{
-  Eigen::VectorXd constraint_error = calcError(joint_values);
-  Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
-  Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
-  for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
-  {
-    out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
-  }
-}
+// void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+//                               Eigen::Ref<Eigen::MatrixXd> out) const
+// {
+//   Eigen::VectorXd constraint_error = calcError(joint_values);
+//   Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
+//   Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
+//   for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
+//   {
+//     out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
+//   }
+// }
 
 /******************************************
  * Position constraints
@@ -299,34 +296,79 @@ void LinearSystemPositionConstraint::parseConstraintMsg(const moveit_msgs::Const
     }
   }
 
-  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on x-position? " << (is_dim_constrained_[0] ? "yes" : "no"));
-  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on y-position? " << (is_dim_constrained_[1] ? "yes" : "no"));
-  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Linear system constraint on z-position? " << (is_dim_constrained_[2] ? "yes" : "no"));
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraint on x-position? " << (is_dim_constrained_[0] ? "yes" : "no"));
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraint on y-position? " << (is_dim_constrained_[1] ? "yes" : "no"));
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraint on z-position? " << (is_dim_constrained_[2] ? "yes" : "no"));
 
   // extract target position and orientation
   geometry_msgs::Point position =
       constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
-  start_position_ << position.x, position.y, position.z;
-  position =
-      constraints.position_constraints.at(0).constraint_region.primitive_poses.at(1).position;
-  end_position_ << position.x, position.y, position.z;
+  target_position_ << position.x, position.y, position.z;
   tf2::fromMsg(constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).orientation,
                            target_orientation_);
 
+  // extract target position and orientation
+  geometry_msgs::Point position_start =
+      constraints.position_constraints.at(0).constraint_region.primitive_poses.at(1).position;
+  start_position_ << position_start.x, position_start.y, position_start.z;
+  geometry_msgs::Point position_end =
+      constraints.position_constraints.at(0).constraint_region.primitive_poses.at(2).position;
+  end_position_ << position_end.x, position_end.y, position_end.z;
+
   link_name_ = constraints.position_constraints.at(0).link_name;
   ROS_INFO_STREAM_NAMED(LOGNAME, "Position constraints applied to link: " << link_name_);
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Start position: " << start_position_);
+  ROS_INFO_STREAM_NAMED(LOGNAME, "End position: " << end_position_);
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Target position: " << target_position_);
+  // ROS_INFO_STREAM_NAMED(LOGNAME, "Target orientation: " << target_orientation_);
+
+  Eigen::Vector3d cartesianPosition = start_position_;
+  Eigen::Vector3d residual;
+  // (yb-ya)(z-za)-(zb-za)(y-ya)=0
+  residual[0] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
+  // (zb-za)(x-xa)-(xb-xa)(z-za)=0
+  residual[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
+  // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
+  residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Residual of the start position " << residual);
+  cartesianPosition = target_position_;
+  // (yb-ya)(z-za)-(zb-za)(y-ya)=0
+  residual[0] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
+  // (zb-za)(x-xa)-(xb-xa)(z-za)=0
+  residual[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
+  // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
+  residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Residual of the target position " << residual);
+  cartesianPosition = end_position_;
+  // (yb-ya)(z-za)-(zb-za)(y-ya)=0
+  residual[0] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
+  // (zb-za)(x-xa)-(xb-xa)(z-za)=0
+  residual[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
+  // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
+  residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Residual of the end position " << residual);
 }
 
 void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
                                           Eigen::Ref<Eigen::VectorXd> out) const
 {
-  // Eigen::Vector3d cartesianPosition = target_orientation_.matrix().transpose() * forwardKinematics(joint_values).translation();
-  Eigen::Vector3d cartesianPosition = forwardKinematics(joint_values).translation();
-  Eigen::Vector2d residual;
-  residual[0] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
-  residual[1] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
-  out = residual;
-  out[3] = 0.0;  // unbounded dimension
+  Eigen::Vector3d cartesianPosition = target_orientation_.matrix().transpose() * forwardKinematics(joint_values).translation();
+  // We don't need to rotate the target to fit in the constraints box, the cartesian constraints line is given in world coordinate frame
+  // Eigen::Vector3d cartesianPosition = forwardKinematics(joint_values).translation();
+  Eigen::Vector3d residual;
+  // (yb-ya)(z-za)-(zb-za)(y-ya)=0
+  residual[0] = (end_position_.y() - start_position_.y())*(cartesianPosition.z() - start_position_.z())-(end_position_.z() - start_position_.z())*(cartesianPosition.y() - start_position_.y());
+  // (zb-za)(x-xa)-(xb-xa)(z-za)=0
+  residual[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
+  // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
+  residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
+  for (std::size_t dim{ 0 }; dim < 3; ++dim)
+  {
+    if (is_dim_constrained_[dim])
+      out[dim] = residual[dim];  // equality constraint dimension
+    else
+      out[dim] = 0.0;  // unbounded dimension
+  }
 }
 
 
@@ -334,21 +376,33 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
 //                                           Eigen::Ref<Eigen::MatrixXd> out) const
 // {
 //   out.setZero();
-//   Eigen::MatrixXd jac = target_orientation_.matrix().transpose() * robotGeometricJacobian(joint_values).topRows(3);
+//   // Eigen::MatrixXd jac = target_orientation_.matrix().transpose() * robotGeometricJacobian(joint_values).topRows(3);
+//   Eigen::MatrixXd jac = robotGeometricJacobian(joint_values).topRows(3);
 //   Eigen::MatrixXd dresidual_dcartesianPosition;
-//   // d residual[0] / d x
-//   dresidual_dcartesianPosition[0,0] = start_position_.y() - end_position_.y();
-//   // d residual[1] / d x
-//   dresidual_dcartesianPosition[1,0] = 0;
-//   // d residual[0] / d y
-//   dresidual_dcartesianPosition[0,1] = end_position_.x() - start_position_.x();
-//   // d residual[1] / d y
-//   dresidual_dcartesianPosition[1,1] = start_position_.z() - end_position_.z();
-//   // d residual[0] / d z
-//   dresidual_dcartesianPosition[0,1] = 0;
-//   // d residual[1] / d z
-//   dresidual_dcartesianPosition[1,1] = end_position_.y() - start_position_.y();
-//   out = dresidual_dcartesianPosition * jac;
+//   // d residual[0] / d x = 0
+//   dresidual_dcartesianPosition(0,0) = 0;
+//   // d residual[1] / d x = (zb-za)
+//   dresidual_dcartesianPosition(1,0) = end_position_.z() - start_position_.z();
+//   // d residual[2] / d x = (ya-yb)
+//   dresidual_dcartesianPosition(2,0) = start_position_.y() - end_position_.y();
+//   // d residual[0] / d y = (za-zb)
+//   dresidual_dcartesianPosition(0,1) = start_position_.z() - end_position_.z();
+//   // d residual[1] / d y = 0
+//   dresidual_dcartesianPosition(1,1) = 0;
+//   // d residual[2] / d y = (xb-xa)
+//   dresidual_dcartesianPosition(2,1) = end_position_.x() - start_position_.x();
+//   // d residual[0] / d z = (yb-ya)
+//   dresidual_dcartesianPosition(0,2) = end_position_.y() - start_position_.y();
+//   // d residual[1] / d z = (xa-xb)
+//   dresidual_dcartesianPosition(1,2) = start_position_.x() - end_position_.x();
+//   // d residual[2] / d z = 0
+//   dresidual_dcartesianPosition(2,2) = 0;
+//   // Eigen::MatrixXd residuald = dresidual_dcartesianPosition * jac;
+//   for (std::size_t dim{ 0 }; dim < 3; ++dim)
+//   {
+//     if (is_dim_constrained_[dim])
+//       out.row(dim) = dresidual_dcartesianPosition.row(dim) * jac;  // equality constraint dimension
+//   }
 // }
 
 /************************************
@@ -408,7 +462,7 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
     }
     else if (constraints.name == "linear_system_constraints")
     {
-      ROS_INFO_STREAM("Using position constraints from a linear system.");
+      ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using position constraints from a linear system.");
       pos_con = std::make_shared<LinearSystemPositionConstraint>(robot_model, group, num_dofs);
     }
     else

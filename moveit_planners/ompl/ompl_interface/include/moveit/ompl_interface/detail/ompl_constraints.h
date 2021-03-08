@@ -50,6 +50,8 @@ namespace ompl_interface
 MOVEIT_CLASS_FORWARD(BaseConstraint);
 MOVEIT_CLASS_FORWARD(BoxConstraint);
 MOVEIT_CLASS_FORWARD(OrientationConstraint);
+// MOVEIT_CLASS_FORWARD(LinearSystemPositionConstraint);
+// MOVEIT_CLASS_FORWARD(EqualityPositionConstraint);
 
 /** \brief Represents upper and lower bound on the elements of a vector.
  *
@@ -144,7 +146,7 @@ public:
    * Optionally you can also provide dF(q)/dq, the Jacobian of  the constraint.
    *
    * */
-  void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
+  // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
   /** \brief Wrapper for forward kinematics calculated by MoveIt's Robot State.
    *
@@ -213,6 +215,16 @@ public:
   const Eigen::Vector3d getTargetPosition()
   {
     return target_position_;
+  }
+
+  const Eigen::Vector3d getStartPosition()
+  {
+    return start_position_;
+  }
+
+  const Eigen::Vector3d getEndPosition()
+  {
+    return end_position_;
   }
 
   const Eigen::Quaterniond getTargetOrientation()
@@ -296,7 +308,7 @@ class LinearSystemPositionConstraint : public BaseConstraint
 public:
   LinearSystemPositionConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
                              const unsigned int num_dofs);
-  virtual void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
+  void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   void function(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::VectorXd> out) const override;
   // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
@@ -316,7 +328,7 @@ private:
    *
    * That's why the value is 1e-3 > 1e-4.
    * **/
-  double EQUALITY_CONSTRAINT_THRESHOLD_{ 0.001 };
+  static constexpr double EQUALITY_CONSTRAINT_THRESHOLD_{ 0.001 };
 
   /** \brief Bool vector indicating wich dimensions are constrained. **/
   std::vector<bool> is_dim_constrained_;
