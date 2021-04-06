@@ -217,20 +217,25 @@ public:
     return target_position_;
   }
 
-  const Eigen::Vector3d getStartPosition()
-  {
-    return start_position_;
-  }
+  // const Eigen::Vector3d getStartPosition()
+  // {
+  //   return start_position_;
+  // }
 
-  const Eigen::Vector3d getEndPosition()
-  {
-    return end_position_;
-  }
+  // const Eigen::Vector3d getEndPosition()
+  // {
+  //   return end_position_;
+  // }
 
-  const Eigen::Quaterniond getTargetOrientation()
-  {
-    return target_orientation_;
-  }
+  // const Eigen::Vector3d getInterimPosition()
+  // {
+  //   return interim_position_;
+  // }
+
+  // const Eigen::Quaterniond getTargetOrientation()
+  // {
+  //   return target_orientation_;
+  // }
 
 protected:
   /** \brief Thread-safe storage of the robot state.
@@ -254,12 +259,6 @@ protected:
 
   /** \brief target for equality constraints, nominal value for inequality constraints. */
   Eigen::Vector3d target_position_;
-
-  /** \brief start position for equality constraints. */
-  Eigen::Vector3d start_position_;
-
-  /** \brief end position for equality constraints. */
-  Eigen::Vector3d end_position_;
 
   /** \brief target for equality constraints, nominal value for inequality constraints. */
   Eigen::Quaterniond target_orientation_;
@@ -332,6 +331,30 @@ private:
 
   /** \brief Bool vector indicating wich dimensions are constrained. **/
   std::vector<bool> is_dim_constrained_;
+
+  /** \brief number of Cartesian path points for linear system constraints. */
+  int knot_number_;
+
+  /** \brief start position for linear system constraints. */
+  Eigen::Vector3d start_position_;
+
+  /** \brief end position for linear system constraints. */
+  Eigen::Vector3d end_position_;
+
+  /** \brief position of circle interim point. */
+  Eigen::Vector3d interim_position_;
+
+  /** \brief position of circle center. */
+  Eigen::Vector3d center_position_;
+
+  /** \brief axis passing through circle center. */
+  Eigen::Vector3d cylinder_axis_;
+
+  /** \brief . */
+  double norm_ortho_n_CI_;
+
+  /** \brief . */
+  double coeff_d_;
 };
 
 /******************************************
