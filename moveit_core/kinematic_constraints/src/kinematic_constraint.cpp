@@ -686,9 +686,25 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
     euler_angles_error = CalcEulerAngles(diff.linear());
   }
 
+  // Converting from a rotation matrix to an intrinsic XYZ euler angles have 2 singularities:
+  // pitch ~= pi/2 ==> roll + yaw = theta
+  // pitch ~= -pi/2 ==> roll - yaw = theta
+  // in those cases CalcEulerAngles will set roll (xyz(0)) to theta and yaw (xyz(2)) to zero, so for us to be able to
+  // capture yaw tolerance violation we do the following, if theta violate the absolute yaw tolerance we think of it as
+  // pure yaw rotation and set roll to zero
+  auto& xyz = std::get<Eigen::Vector3d>(euler_angles_error);
+  if (!std::get<bool>(euler_angles_error))
+  {
+    if (normalizeAbsoluteAngle(xyz(0)) > absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon())
+    {
+      xyz(2) = xyz(0);
+      xyz(0) = 0;
+    }
+  }
+
   if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
   {
-    xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
+    // xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
     xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::two_pi<double>() - fabs(xyz(0)));
     xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::two_pi<double>() - fabs(xyz(1)));
     xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::two_pi<double>() - fabs(xyz(2)));
@@ -708,22 +724,6 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
                            "The parameterization type for the orientation constraints is invalid.");
   }
   
-
-  // Converting from a rotation matrix to an intrinsic XYZ euler angles have 2 singularities:
-  // pitch ~= pi/2 ==> roll + yaw = theta
-  // pitch ~= -pi/2 ==> roll - yaw = theta
-  // in those cases CalcEulerAngles will set roll (xyz(0)) to theta and yaw (xyz(2)) to zero, so for us to be able to
-  // capture yaw tolerance violation we do the following, if theta violate the absolute yaw tolerance we think of it as
-  // pure yaw rotation and set roll to zero
-  auto& xyz = std::get<Eigen::Vector3d>(euler_angles_error);
-  if (!std::get<bool>(euler_angles_error))
-  {
-    if (normalizeAbsoluteAngle(xyz(0)) > absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon())
-    {
-      xyz(2) = xyz(0);
-      xyz(0) = 0;
-    }
-  }
   // Account for angle wrapping
   xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
 
