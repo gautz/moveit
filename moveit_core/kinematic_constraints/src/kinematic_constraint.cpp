@@ -668,31 +668,35 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
   if (!link_model_)
     return ConstraintEvaluationResult(true, 0.0);
 
-  // Eigen::Vector3d xyz;
+  Eigen::Vector3d xyz;
   Eigen::Isometry3d diff;
   std::tuple<Eigen::Vector3d, bool> euler_angles_error;
+  Eigen::AngleAxisd angle_axis;
+
   if (mobile_frame_)
   {
     // getFrameTransform() returns a valid isometry by contract
     Eigen::Matrix3d tmp = state.getFrameTransform(desired_rotation_frame_id_).linear() * desired_rotation_matrix_;
     // getGlobalLinkTransform() returns a valid isometry by contract
     Eigen::Isometry3d diff(tmp.transpose() * state.getGlobalLinkTransform(link_model_).linear());  // valid isometry
-    euler_angles_error = CalcEulerAngles(diff.linear());
   }
   else
   {
     // diff is valid isometry by construction
     Eigen::Isometry3d diff(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
-    euler_angles_error = CalcEulerAngles(diff.linear());
   }
 
+  if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
+  {
+    // ROS_INFO_NAMED("kinematic_constraints", "Using parameterization type Euler Angles");
+  euler_angles_error = CalcEulerAngles(diff.linear());
   // Converting from a rotation matrix to an intrinsic XYZ euler angles have 2 singularities:
   // pitch ~= pi/2 ==> roll + yaw = theta
   // pitch ~= -pi/2 ==> roll - yaw = theta
   // in those cases CalcEulerAngles will set roll (xyz(0)) to theta and yaw (xyz(2)) to zero, so for us to be able to
   // capture yaw tolerance violation we do the following, if theta violate the absolute yaw tolerance we think of it as
   // pure yaw rotation and set roll to zero
-  auto& xyz = std::get<Eigen::Vector3d>(euler_angles_error);
+  xyz = std::get<Eigen::Vector3d>(euler_angles_error);
   if (!std::get<bool>(euler_angles_error))
   {
     if (normalizeAbsoluteAngle(xyz(0)) > absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon())
@@ -702,17 +706,18 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
     }
   }
 
-  if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
-  {
     // xyz = diff.linear().eulerAngles(0, 1, 2);  // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
-    xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::two_pi<double>() - fabs(xyz(0)));
-    xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::two_pi<double>() - fabs(xyz(1)));
-    xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::two_pi<double>() - fabs(xyz(2)));
+    // xyz(0) = std::min(fabs(xyz(0)), boost::math::constants::two_pi<double>() - fabs(xyz(0)));
+    // xyz(1) = std::min(fabs(xyz(1)), boost::math::constants::two_pi<double>() - fabs(xyz(1)));
+    // xyz(2) = std::min(fabs(xyz(2)), boost::math::constants::two_pi<double>() - fabs(xyz(2)));
+    // Account for angle wrapping
+    xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
   }
   else if (parameterization_ == moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
   {
-    Eigen::AngleAxisd aa(diff.linear());
-    xyz = aa.axis() * aa.angle();
+    // ROS_INFO_NAMED("kinematic_constraints", "Using parameterization type Angle-Axis");
+    angle_axis = Eigen::AngleAxisd(diff.linear());
+    xyz = angle_axis.axis() * angle_axis.angle();
     xyz(0) = fabs(xyz(0));
     xyz(1) = fabs(xyz(1));
     xyz(2) = fabs(xyz(2));
@@ -725,7 +730,7 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
   }
   
   // Account for angle wrapping
-  xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
+  // xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
 
   // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
   bool result = xyz(2) < absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
