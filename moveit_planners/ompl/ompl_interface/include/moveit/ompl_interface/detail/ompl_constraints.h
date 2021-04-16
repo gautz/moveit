@@ -92,6 +92,16 @@ public:
 
   std::size_t size() const;
 
+  const std::vector<double> getUpper()
+  {
+    return upper_;
+  }
+
+  const std::vector<double> getLower()
+  {
+    return lower_;
+  }
+
 private:
   std::vector<double> lower_, upper_;
   std::size_t size_{ 0 };
@@ -144,7 +154,7 @@ public:
    * Optionally you can also provide dF(q)/dq, the Jacobian of  the constraint.
    *
    * */
-  void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
+  // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
   /** \brief Wrapper for forward kinematics calculated by MoveIt's Robot State.
    *
@@ -271,7 +281,7 @@ public:
                 const unsigned int num_dofs);
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
 };
 
 /******************************************
@@ -357,7 +367,52 @@ public:
 
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+};
+
+// /******************************************
+//  * Pose equality constraints
+//  * ****************************************/
+// /** \brief Pose constraints with position equality and orientation parameterized using exponential coordinates.
+//  *
+//  * An orientation constraints is modelled as a deviation from a target orientation.
+//  *
+//  * */
+// class PoseConstraint : public BaseConstraint
+// {
+// public:
+//   PoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
+//                         const unsigned int num_dofs);
+
+//   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
+//   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+//   // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+
+// private:
+//   static constexpr double EQUALITY_CONSTRAINT_THRESHOLD_{ 0.001 };
+
+//   /** \brief Bool vector indicating which dimensions are constrained. **/
+//   std::vector<bool> is_dim_constrained_;
+// };
+
+/******************************************
+ * Pose box constraints
+ * ****************************************/
+/** \brief Pose constraints with position box and orientation parameterized using exponential coordinates.
+ *
+ * An orientation constraints is modelled as a deviation from a target orientation.
+ *
+ * */
+class BoxPoseConstraint : public BaseConstraint
+{
+public:
+  BoxPoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
+                        const unsigned int num_dofs);
+
+  void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
+  Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+
 };
 
 /** \brief Extract position constraints from the MoveIt message.
