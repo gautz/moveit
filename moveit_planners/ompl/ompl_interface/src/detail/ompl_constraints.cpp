@@ -500,8 +500,10 @@ Eigen::VectorXd BoxPoseConstraint::calcError(const Eigen::Ref<const Eigen::Vecto
   // error.push_back(aa.axis()[1] * aa.angle()[1]);
   // ROS_INFO_STREAM_NAMED(LOGNAME,  error_pos);
   // ROS_INFO_STREAM_NAMED(LOGNAME,  error_ori);
-  Eigen::VectorXd error = Eigen::VectorXd(5);
-  error << error_pos, error_ori[0], error_ori[1];
+  Eigen::VectorXd error = Eigen::VectorXd(6);
+  error << error_pos, error_ori;
+  // Eigen::VectorXd error = Eigen::VectorXd(5);
+  // error << error_pos, error_ori[0], error_ori[1];
   return error;
 }
 
