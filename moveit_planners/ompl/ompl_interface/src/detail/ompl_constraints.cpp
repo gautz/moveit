@@ -140,17 +140,17 @@ void BaseConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_val
   out = bounds_.penalty(current_values);
 }
 
-// void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-//                               Eigen::Ref<Eigen::MatrixXd> out) const
-// {
-//   Eigen::VectorXd constraint_error = calcError(joint_values);
-//   Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
-//   Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
-//   for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
-//   {
-//     out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
-//   }
-// }
+void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                              Eigen::Ref<Eigen::MatrixXd> out) const
+{
+  Eigen::VectorXd constraint_error = calcError(joint_values);
+  Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
+  Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
+  for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
+  {
+    out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
+  }
+}
 
 /******************************************
  * Position Box constraints
@@ -543,7 +543,7 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
   out[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
   // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
   // residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
-  out[2]=0;
+  out[2]=0.0;
   // for (std::size_t dim{ 0 }; dim < 3; ++dim)
   // {
   //   if (is_dim_constrained_[dim])
@@ -598,38 +598,55 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
 }
 
 
-// void LinearSystemPositionConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-//                                           Eigen::Ref<Eigen::MatrixXd> out) const
-// {
-//   out.setZero();
-//   // Eigen::MatrixXd jac = target_orientation_.matrix().transpose() * robotGeometricJacobian(joint_values).topRows(3);
-//   Eigen::MatrixXd jac = robotGeometricJacobian(joint_values).topRows(3);
-//   Eigen::MatrixXd dresidual_dcartesianPosition;
-//   // d residual[0] / d x = 0
-//   dresidual_dcartesianPosition(0,0) = 0;
-//   // d residual[1] / d x = (zb-za)
-//   dresidual_dcartesianPosition(1,0) = end_position_.z() - start_position_.z();
-//   // d residual[2] / d x = (ya-yb)
-//   dresidual_dcartesianPosition(2,0) = start_position_.y() - end_position_.y();
-//   // d residual[0] / d y = (za-zb)
-//   dresidual_dcartesianPosition(0,1) = start_position_.z() - end_position_.z();
-//   // d residual[1] / d y = 0
-//   dresidual_dcartesianPosition(1,1) = 0;
-//   // d residual[2] / d y = (xb-xa)
-//   dresidual_dcartesianPosition(2,1) = end_position_.x() - start_position_.x();
-//   // d residual[0] / d z = (yb-ya)
-//   dresidual_dcartesianPosition(0,2) = end_position_.y() - start_position_.y();
-//   // d residual[1] / d z = (xa-xb)
-//   dresidual_dcartesianPosition(1,2) = start_position_.x() - end_position_.x();
-//   // d residual[2] / d z = 0
-//   dresidual_dcartesianPosition(2,2) = 0;
-//   // Eigen::MatrixXd residuald = dresidual_dcartesianPosition * jac;
-//   for (std::size_t dim{ 0 }; dim < 3; ++dim)
-//   {
-//     if (is_dim_constrained_[dim])
-//       out.row(dim) = dresidual_dcartesianPosition.row(dim) * jac;  // equality constraint dimension
-//   }
-// }
+void LinearSystemPositionConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                                          Eigen::Ref<Eigen::MatrixXd> out) const
+{
+  out.setZero();
+  Eigen::MatrixXd jac = target_orientation_.matrix().transpose() * robotGeometricJacobian(joint_values).topRows(3);
+  // Eigen::MatrixXd jac = robotGeometricJacobian(joint_values).topRows(3);
+  Eigen::MatrixXd dresidual_dcartesianPosition = Eigen::MatrixXd::Zero(2,3);
+
+  if(knot_number_==2) // The position is contrained on a line passing through two points
+  {
+  // d residual[0] / d x = 0
+  dresidual_dcartesianPosition(0,0) = 0.0;
+  // d residual[1] / d x = (zb-za)
+  dresidual_dcartesianPosition(1,0) = end_position_.z() - start_position_.z();
+  // d residual[2] / d x = (ya-yb)
+  // dresidual_dcartesianPosition(2,0) = start_position_.y() - end_position_.y();
+  // d residual[0] / d y = (za-zb)
+  dresidual_dcartesianPosition(0,1) = start_position_.z() - end_position_.z();
+  // d residual[1] / d y = 0
+  dresidual_dcartesianPosition(1,1) = 0.0;
+  // d residual[2] / d y = (xb-xa)
+  // dresidual_dcartesianPosition(2,1) = end_position_.x() - start_position_.x();
+  // d residual[0] / d z = (yb-ya)
+  dresidual_dcartesianPosition(0,2) = end_position_.y() - start_position_.y();
+  // d residual[1] / d z = (xa-xb)
+  dresidual_dcartesianPosition(1,2) = start_position_.x() - end_position_.x();
+  // d residual[2] / d z = 0
+  // dresidual_dcartesianPosition(2,2) = 0.0;
+  // Eigen::MatrixXd residuald = dresidual_dcartesianPosition * jac;
+  out.row(0) = dresidual_dcartesianPosition.row(0) * jac;
+  out.row(1) = dresidual_dcartesianPosition.row(1) * jac;
+  // out.row(3).setZero();
+  // for (std::size_t dim{ 0 }; dim < 3; ++dim)
+  // {
+  //   if (is_dim_constrained_[dim])
+  //     out.row(dim) = dresidual_dcartesianPosition.row(dim) * jac;  // equality constraint dimension
+  // }
+  }
+  else if(knot_number_==3) // The position is contrained on a circle passing through 3 points
+  {
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Jacobian currently not available for Circle constraints");
+  }
+  else if(knot_number_>3) {
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);
+  }
+  else{
+  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraints require at least 2 knots. Number of knots given: " << knot_number_);
+  }
+}
 
 /************************************
  * MoveIt constraint message parsing
@@ -688,12 +705,12 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
 
   if (num_pos_con > 0 && num_ori_con > 0)
   {
-    ROS_DEBUG_STREAM_NAMED(LOGNAME, "Constraint name: " << constraints.name);
-    BaseConstraintPtr pose_con;
-      ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using box pose constraints.");
-      pose_con = std::make_shared<BoxPoseConstraint>(robot_model, group, num_dofs);
-    pose_con->init(constraints);
-    return pose_con;
+    // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Constraint name: " << constraints.name);
+    // BaseConstraintPtr pose_con;
+      ROS_ERROR_NAMED(LOGNAME, "Pose constraints not implemented.");
+    //   pose_con = std::make_shared<BoxPoseConstraint>(robot_model, group, num_dofs);
+    // pose_con->init(constraints);
+    // return pose_con;
   }
   else if (num_pos_con > 0)
   {
@@ -719,11 +736,11 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
   }
   else if (num_ori_con > 0)
   {
-    ROS_INFO_NAMED(LOGNAME, "OMPL is using orientation constraints.");
-    BaseConstraintPtr ori_con;
-    ori_con = std::make_shared<OrientationConstraint>(robot_model, group, num_dofs);
-    ori_con->init(constraints);
-    return ori_con;
+    ROS_ERROR_NAMED(LOGNAME, "Orientation constraints not supported.");
+    // BaseConstraintPtr ori_con;
+    // ori_con = std::make_shared<OrientationConstraint>(robot_model, group, num_dofs);
+    // ori_con->init(constraints);
+    // return ori_con;
   }
   else
   {

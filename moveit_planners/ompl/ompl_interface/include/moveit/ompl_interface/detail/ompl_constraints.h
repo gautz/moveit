@@ -156,7 +156,7 @@ public:
    * Optionally you can also provide dF(q)/dq, the Jacobian of  the constraint.
    *
    * */
-  // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
+  void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
   /** \brief Wrapper for forward kinematics calculated by MoveIt's Robot State.
    *
@@ -319,7 +319,7 @@ public:
                              const unsigned int num_dofs);
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   void function(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::VectorXd> out) const override;
-  // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
+  void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
 private:
   /** \brief Position bounds under this threshold are interpreted as equality constraints, the others as unbounded.
@@ -416,86 +416,6 @@ private:
 
   /** \brief Bool vector indicating which dimensions are constrained. **/
   std::vector<bool> is_dim_constrained_;
-};
-
-/******************************************
- * Orientation constraints
- * ****************************************/
-/** \brief Orientation constraints parameterized using exponential coordinates.
- *
- * An orientation constraints is modelled as a deviation from a target orientation.
- * The deviation is represented using exponential coordinates. A three element vector represents the rotation axis
- * multiplied with the angle in radians around this axis.
- *
- *  R_error = R_end_effector ^ (-1) * R_target
- *  R_error -> rotation angle and axis           (using Eigen3)
- *  error = angle * axis                         (vector with three elements)
- *
- *  And then the constraints can be written as
- *
- *     - absolute_x_axis_tolerance / 2 < error[0] < absolute_x_axis_tolerance / 2
- *     - absolute_y_axis_tolerance / 2 < error[1] < absolute_y_axis_tolerance / 2
- *     - absolute_z_axis_tolerance / 2 < error[2] < absolute_z_axis_tolerance / 2
- *
- * **IMPORTANT** It is NOT how orientation error is handled in the default MoveIt constraint samplers, where XYZ
- * intrinsic euler angles are used. Using exponential coordinates is analog to how orientation Error is calculated in
- * the TrajOpt  motion planner.
- *
- * */
-class OrientationConstraint : public BaseConstraint
-{
-public:
-  OrientationConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
-                        const unsigned int num_dofs);
-
-  void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
-  Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-};
-
-// /******************************************
-//  * Pose equality constraints
-//  * ****************************************/
-// /** \brief Pose constraints with position equality and orientation parameterized using exponential coordinates.
-//  *
-//  * An orientation constraints is modelled as a deviation from a target orientation.
-//  *
-//  * */
-// class PoseConstraint : public BaseConstraint
-// {
-// public:
-//   PoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
-//                         const unsigned int num_dofs);
-
-//   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
-//   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-//   // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-
-// private:
-//   static constexpr double EQUALITY_CONSTRAINT_THRESHOLD_{ 0.001 };
-
-//   /** \brief Bool vector indicating which dimensions are constrained. **/
-//   std::vector<bool> is_dim_constrained_;
-// };
-
-/******************************************
- * Pose box constraints
- * ****************************************/
-/** \brief Pose constraints with position box and orientation parameterized using exponential coordinates.
- *
- * An orientation constraints is modelled as a deviation from a target orientation.
- *
- * */
-class BoxPoseConstraint : public BaseConstraint
-{
-public:
-  BoxPoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
-                        const unsigned int num_dofs);
-
-  void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
-  Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-
 };
 
 /** \brief Extract position constraints from the MoveIt message.
