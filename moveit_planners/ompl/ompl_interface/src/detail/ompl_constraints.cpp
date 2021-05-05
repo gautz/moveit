@@ -156,7 +156,7 @@ void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_val
 }
 
 /******************************************
- * Position constraints
+ * Position Box constraints
  * ****************************************/
 BoxConstraint::BoxConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
                              const unsigned int num_dofs)
@@ -194,7 +194,7 @@ Eigen::MatrixXd BoxConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::V
 }
 
 /******************************************
- * Equality constraints
+ * Position Equality constraints
  * ****************************************/
 EqualityPositionConstraint::EqualityPositionConstraint(const robot_model::RobotModelConstPtr& robot_model,
                                                        const std::string& group, const unsigned int num_dofs)
@@ -267,7 +267,7 @@ void EqualityPositionConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd
 }
 
 /******************************************
- * Orientation constraints
+ * Orientation Box constraints
  * ****************************************/
 OrientationConstraint::OrientationConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
                         const unsigned int num_dofs)
@@ -282,14 +282,6 @@ void OrientationConstraint::parseConstraintMsg(const moveit_msgs::Constraints& c
   bounds_ = orientationConstraintMsgToBoundVector(constraints.orientation_constraints.at(0));
   ROS_INFO_NAMED(LOGNAME, "Parsed Orientation constraints");
   ROS_INFO_STREAM_NAMED(LOGNAME,  bounds_);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rx / roll constraints" << bounds_[0]);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed ry / pitch constraints" << bounds_[1]);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rz / yaw constraints" << bounds_[2]);
-
-  // extract target position and orientation
-  // geometry_msgs::Point position =
-  //     constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
-  // target_position_ << position.x, position.y, position.z;
   tf2::fromMsg(constraints.orientation_constraints.at(0).orientation,
                target_orientation_);
   ROS_INFO_NAMED(LOGNAME, "Quaternion desired");
@@ -317,114 +309,8 @@ Eigen::MatrixXd OrientationConstraint::calcErrorJacobian(const Eigen::Ref<const 
   return -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
 }
 
-// /******************************************
-//  * Position equality and Orientation box constraints
-//  * ****************************************/
-// PoseConstraint::PoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
-//                         const unsigned int num_dofs)
-//     : BaseConstraint(robot_model, group, num_dofs)
-//   {
-//   }
-
-// void PoseConstraint::parseConstraintMsg(const moveit_msgs::Constraints& constraints)
-// {
-//   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsing equality position constraint for OMPL constrained state space.");
-
-//   std::vector<double> dims = constraints.position_constraints.at(0).constraint_region.primitives.at(0).dimensions;
-
-//   is_dim_constrained_ = { false, false, false };
-//   for (std::size_t i{ 0 }; i < dims.size(); ++i)
-//   {
-//     if (dims[i] < EQUALITY_CONSTRAINT_THRESHOLD_)
-//     {
-//       if (dims[i] < getTolerance())
-//       {
-//         ROS_ERROR_NAMED(
-//             LOGNAME,
-//             "Dimension %li of position constraint is smaller than the tolerance used to evaluate the constraints. "
-//             "This will make all states invalid and planning will fail :( Please use a value between %f and %f. ",
-//             i, getTolerance(), EQUALITY_CONSTRAINT_THRESHOLD_);
-//       }
-//       is_dim_constrained_.at(i) = true;
-//     }
-//   }
-
-//   // extract target position and orientation
-//   geometry_msgs::Point position =
-//       constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
-//   target_position_ << position.x, position.y, position.z;
-//   // tf2::fromMsg(constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).orientation,
-//   //              target_orientation_);
-
-//   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Equality constraint on x-position? " << (is_dim_constrained_[0] ? "yes" : "no"));
-//   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Equality constraint on y-position? " << (is_dim_constrained_[1] ? "yes" : "no"));
-//   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Equality constraint on z-position? " << (is_dim_constrained_[2] ? "yes" : "no"));
-
-  
-//   ROS_INFO_STREAM_NAMED(LOGNAME, "Parsing Orientation constraints for OMPL constrained state space.");
-//   assert(bounds_.size() == 0);
-//   bounds_ = orientationConstraintMsgToBoundVector(constraints.orientation_constraints.at(0));
-//   ROS_INFO_NAMED(LOGNAME, "Parsed Orientation constraints");
-//   ROS_INFO_STREAM_NAMED(LOGNAME,  bounds_);
-//   // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rx / roll constraints" << bounds_[0]);
-//   // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed ry / pitch constraints" << bounds_[1]);
-//   // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rz / yaw constraints" << bounds_[2]);
-
-//   // extract target position and orientation
-//   // geometry_msgs::Point position =
-//   //     constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
-//   // target_position_ << position.x, position.y, position.z;
-//   tf2::fromMsg(constraints.orientation_constraints.at(0).orientation,
-//                target_orientation_);
-//   ROS_INFO_NAMED(LOGNAME, "Quaternion desired");
-//   ROS_INFO_STREAM_NAMED(LOGNAME,  target_orientation_.x());
-//   ROS_INFO_STREAM_NAMED(LOGNAME,  target_orientation_.y());
-//   ROS_INFO_STREAM_NAMED(LOGNAME,  target_orientation_.z());
-//   ROS_INFO_STREAM_NAMED(LOGNAME,  target_orientation_.w());
-
-//   link_name_ = constraints.position_constraints.at(0).link_name;
-//   ROS_INFO_STREAM_NAMED(LOGNAME, "Pose constraints applied to link: " << link_name_);
-// }
-
-
-// Eigen::VectorXd PoseConstraint::calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const
-// {
-//   // Eigen::Matrix<double, 5, 1> error;
-//   // Eigen::Matrix<double, 6, 1> error;
-//   Eigen::VectorXd error;
-//   error = target_orientation_.matrix().transpose() * (forwardKinematics(x).translation() - target_position_);
-//   // error.assign(3,target_orientation_.matrix().transpose() * (forwardKinematics(x).translation() - target_position_));
-//   // Eigen::Vector3d error =
-//   //     target_orientation_.matrix().transpose() * (forwardKinematics(joint_values).translation() - target_position_);
-//   // Eigen::Ref<Eigen::VectorXd> out;
-//   for (std::size_t dim{ 0 }; dim < 3; ++dim)
-//   {
-//     if (is_dim_constrained_[dim])
-//       error[dim] = error[dim];  // equality constraint dimension
-//     else
-//       error[dim] = 0.0;  // unbounded dimension
-//   }
-
-//   Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
-//   Eigen::AngleAxisd aa(orientation_difference);
-//   // error.bottomRows(3) = aa.axis() * aa.angle();
-//   error[3] = (aa.axis()[0] * aa.angle());
-//   error[4] = (aa.axis()[0] * aa.angle());
-//   // error.push_back(aa.axis()[0] * aa.angle()[0]);
-//   // error.push_back(aa.axis()[1] * aa.angle()[1]);
-//   return error;
-// }
-
-// Eigen::MatrixXd PoseConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
-// {
-//   target_orientation_.matrix().transpose() * robotGeometricJacobian(x).topRows(3);
-//   Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
-//   Eigen::AngleAxisd aa{ orientation_difference };
-//   return -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
-// }
-
 /******************************************
- * Position box and Orientation box constraints
+ * Position Box and Orientation Box constraints
  * ****************************************/
 BoxPoseConstraint::BoxPoseConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
                         const unsigned int num_dofs)
@@ -446,15 +332,11 @@ void BoxPoseConstraint::parseConstraintMsg(const moveit_msgs::Constraints& const
   target_position_ << position.x, position.y, position.z;
 
   ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsing Orientation constraints for OMPL constrained state space.");
-  // assert(bounds_.size() == 0);
+
   Bounds bounds_ori = orientationConstraintMsgToBoundVector(constraints.orientation_constraints.at(0));
   ROS_DEBUG_NAMED(LOGNAME, "Parsed Orientation constraints");
   ROS_DEBUG_STREAM_NAMED(LOGNAME,  bounds_);
 
-  // extract target position and orientation
-  // geometry_msgs::Point position =
-  //     constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
-  // target_position_ << position.x, position.y, position.z;
   tf2::fromMsg(constraints.orientation_constraints.at(0).orientation,
                target_orientation_);
   ROS_INFO_NAMED(LOGNAME, "Quaternion desired");
@@ -490,14 +372,8 @@ Eigen::VectorXd BoxPoseConstraint::calcError(const Eigen::Ref<const Eigen::Vecto
   Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
   Eigen::AngleAxisd aa(orientation_difference);
   error_ori = aa.axis() * aa.angle();
-  // error[3] = (aa.axis()[0] * aa.angle());
-  // error[4] = (aa.axis()[0] * aa.angle());
-  // error.push_back(aa.axis()[0] * aa.angle()[0]);
-  // error.push_back(aa.axis()[1] * aa.angle()[1]);
 
   Eigen::VectorXd error = Eigen::VectorXd(6);
-  // Eigen::VectorXd error = Eigen::VectorXd(5);
-  // error << error_pos, error_ori[0], error_ori[1];
   return error_pos, error_ori;
 }
 
@@ -573,16 +449,8 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
   {
     ROS_DEBUG_STREAM_NAMED(LOGNAME, "Constraint name: " << constraints.name);
     BaseConstraintPtr pose_con;
-    // if (constraints.name == "use_equality_constraints")
-    // {
-    //   ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using equality pose constraints.");
-    //   pose_con = std::make_shared<PoseConstraint>(robot_model, group, num_dofs);
-    // }
-    // else
-    // {
       ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using box pose constraints.");
       pose_con = std::make_shared<BoxPoseConstraint>(robot_model, group, num_dofs);
-    // }
     pose_con->init(constraints);
     return pose_con;
   }
