@@ -1466,32 +1466,52 @@ public:
    *  @{
    */
 
+  /** \brief Return the sum of joint distances to "other" state. Only considers active joints. */
   double distance(const RobotState& other) const
   {
     return robot_model_->distance(position_, other.getVariablePositions());
   }
 
+  /** \brief Return the sum of joint distances to "other" state. Only considers active joints. */
   double distance(const RobotState& other, const JointModelGroup* joint_group) const;
 
+  /** \brief Return the sum of joint distances to "other" state. Only considers active joints. */
   double distance(const RobotState& other, const JointModel* joint) const
   {
     const int idx = joint->getFirstVariableIndex();
     return joint->distance(position_ + idx, other.position_ + idx);
   }
 
-  /** \brief Interpolate from this state towards state \e to, at time \e t in [0,1].
-      The result is stored in \e state, mimic joints are correctly updated and flags are set
-      so that FK is recomputed when needed. */
+  /**
+   * Interpolate towards "to" state. Mimic joints are correctly updated and flags are set so that FK is recomputed
+   * when needed.
+   *
+   * @param to interpolate to this state
+   * @param t a fraction in the range [0 1]. If 1, the result matches "to" state exactly.
+   * @param state holds the result
+   */
   void interpolate(const RobotState& to, double t, RobotState& state) const;
 
-  /** \brief Interpolate from this state towards \e to, at time \e t in [0,1], but only for the joints in the
-      specified group. If mimic joints need to be updated, they are updated accordingly. Flags are set so that FK
-      computation is triggered when needed. */
+  /**
+   * Interpolate towards "to" state, but only for the joints in the specified group. Mimic joints are correctly updated
+   * and flags are set so that FK is recomputed when needed.
+   *
+   * @param to interpolate to this state
+   * @param t a fraction in the range [0 1]. If 1, the result matches "to" state exactly.
+   * @param state holds the result
+   * @param joint_group interpolate only for the joints in this group
+   */
   void interpolate(const RobotState& to, double t, RobotState& state, const JointModelGroup* joint_group) const;
 
-  /** \brief Update \e state by interpolating form this state towards \e to, at time \e t in [0,1] but only for
-      the joint \e joint. If there are joints that mimic this joint, they are updated. Flags are set so that
-      FK computation is triggered as needed. */
+  /**
+   * Interpolate towards "to" state, but only for a single joint. Mimic joints are correctly updated
+   * and flags are set so that FK is recomputed when needed.
+   *
+   * @param to interpolate to this state
+   * @param t a fraction in the range [0 1]. If 1, the result matches "to" state exactly.
+   * @param state holds the result
+   * @param joint interpolate only for this joint
+   */
   void interpolate(const RobotState& to, double t, RobotState& state, const JointModel* joint) const
   {
     const int idx = joint->getFirstVariableIndex();
@@ -1779,18 +1799,13 @@ public:
 
   std::string getStateTreeString(const std::string& prefix = "") const;
 
-private:
-  void allocMemory();
-  void initTransforms();
-  void copyFrom(const RobotState& other);
-
   /**
    * \brief Transform pose from the robot model's base frame to the reference frame of the IK solver
    * @param pose - the input to change
    * @param solver - a kin solver whose base frame is important to us
    * @return true if no error
    */
-  inline bool setToIKSolverFrame(Eigen::Isometry3d& pose, const kinematics::KinematicsBaseConstPtr& solver);
+  bool setToIKSolverFrame(Eigen::Isometry3d& pose, const kinematics::KinematicsBaseConstPtr& solver);
 
   /**
    * \brief Transform pose from the robot model's base frame to the reference frame of the IK solver
@@ -1799,6 +1814,11 @@ private:
    * @return true if no error
    */
   bool setToIKSolverFrame(Eigen::Isometry3d& pose, const std::string& ik_frame);
+
+private:
+  void allocMemory();
+  void initTransforms();
+  void copyFrom(const RobotState& other);
 
   void markDirtyJointTransforms(const JointModel* joint)
   {

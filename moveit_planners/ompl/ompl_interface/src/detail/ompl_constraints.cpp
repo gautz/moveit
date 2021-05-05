@@ -153,7 +153,7 @@ void BaseConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_val
 // }
 
 /******************************************
- * Position constraints
+ * Position Box constraints
  * ****************************************/
 BoxConstraint::BoxConstraint(const robot_model::RobotModelConstPtr& robot_model, const std::string& group,
                              const unsigned int num_dofs)
@@ -191,7 +191,7 @@ Eigen::MatrixXd BoxConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::V
 }
 
 /******************************************
- * Equality constraints
+ * Position Equality constraints
  * ****************************************/
 EqualityPositionConstraint::EqualityPositionConstraint(const robot_model::RobotModelConstPtr& robot_model,
                                                        const std::string& group, const unsigned int num_dofs)
@@ -648,6 +648,21 @@ Bounds positionConstraintMsgToBoundVector(const moveit_msgs::PositionConstraint&
   return { { -dims[0] / 2, -dims[1] / 2, -dims[2] / 2 }, { dims[0] / 2, dims[1] / 2, dims[2] / 2 } };
 }
 
+Bounds orientationConstraintMsgToBoundVector(const moveit_msgs::OrientationConstraint& ori_con)
+{
+  std::vector<double> dims{ ori_con.absolute_x_axis_tolerance, ori_con.absolute_y_axis_tolerance,
+                            ori_con.absolute_z_axis_tolerance };
+
+  // dimension of -1 signifies unconstrained parameter, so set to infinity
+  for (auto& dim : dims)
+  {
+    if (dim == -1)
+      dim = std::numeric_limits<double>::infinity();
+  }
+  // return { { -dims[0], dims[0] }, { -dims[1], dims[1] }, { -dims[2], dims[2] } };
+  return { { -dims[0], -dims[1], -dims[2] }, { dims[0] , dims[1] , dims[2] } };
+}
+
 /******************************************
  * OMPL Constraints Factory
  * ****************************************/
@@ -673,9 +688,12 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
 
   if (num_pos_con > 0 && num_ori_con > 0)
   {
-    ROS_ERROR_NAMED(LOGNAME, "Combining position and orientation constraints not implemented yet for OMPL's "
-                             "constrained state space.");
-    return nullptr;
+    ROS_DEBUG_STREAM_NAMED(LOGNAME, "Constraint name: " << constraints.name);
+    BaseConstraintPtr pose_con;
+      ROS_INFO_STREAM_NAMED(LOGNAME, "OMPL is using box pose constraints.");
+      pose_con = std::make_shared<BoxPoseConstraint>(robot_model, group, num_dofs);
+    pose_con->init(constraints);
+    return pose_con;
   }
   else if (num_pos_con > 0)
   {
@@ -701,8 +719,11 @@ std::shared_ptr<BaseConstraint> createOMPLConstraint(const robot_model::RobotMod
   }
   else if (num_ori_con > 0)
   {
-    ROS_ERROR_NAMED(LOGNAME, "Orientation constraints are not yet supported.");
-    return nullptr;
+    ROS_INFO_NAMED(LOGNAME, "OMPL is using orientation constraints.");
+    BaseConstraintPtr ori_con;
+    ori_con = std::make_shared<OrientationConstraint>(robot_model, group, num_dofs);
+    ori_con->init(constraints);
+    return ori_con;
   }
   else
   {

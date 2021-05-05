@@ -603,7 +603,20 @@ bool OrientationConstraint::configure(const moveit_msgs::OrientationConstraint& 
     constraint_weight_ = 1.0;
   }
   else
+  {
     constraint_weight_ = oc.weight;
+  }
+
+  parameterization_ = oc.parameterization;
+  // validate the parameterization, set to default value if invalid
+  if (parameterization_ != moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES &&
+      parameterization_ != moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
+  {
+    ROS_WARN_NAMED("kinematic_constraints",
+                   "Unkown parameterization for orientation constraint tolerance, using default (XYZ_EULER_ANGLES).");
+    parameterization_ = moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES;
+  }
+
   absolute_x_axis_tolerance_ = fabs(oc.absolute_x_axis_tolerance);
   if (absolute_x_axis_tolerance_ < std::numeric_limits<double>::epsilon())
     ROS_WARN_NAMED("kinematic_constraints", "Near-zero value for absolute_x_axis_tolerance");
@@ -655,21 +668,28 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
   if (!link_model_)
     return ConstraintEvaluationResult(true, 0.0);
 
+  Eigen::Vector3d xyz;
+  Eigen::Isometry3d diff;
   std::tuple<Eigen::Vector3d, bool> euler_angles_error;
+
   if (mobile_frame_)
   {
     // getFrameTransform() returns a valid isometry by contract
     Eigen::Matrix3d tmp = state.getFrameTransform(desired_rotation_frame_id_).linear() * desired_rotation_matrix_;
     // getGlobalLinkTransform() returns a valid isometry by contract
-    Eigen::Isometry3d diff(tmp.transpose() * state.getGlobalLinkTransform(link_model_).linear());  // valid isometry
+    diff = Eigen::Isometry3d(tmp.transpose() * state.getGlobalLinkTransform(link_model_).linear());  // valid isometry
     euler_angles_error = CalcEulerAngles(diff.linear());
   }
   else
   {
     // diff is valid isometry by construction
-    Eigen::Isometry3d diff(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
+    diff = Eigen::Isometry3d(desired_rotation_matrix_inv_ * state.getGlobalLinkTransform(link_model_).linear());
     euler_angles_error = CalcEulerAngles(diff.linear());
   }
+
+  if (parameterization_ == moveit_msgs::OrientationConstraint::XYZ_EULER_ANGLES)
+  {
+    // ROS_INFO_NAMED("kinematic_constraints", "Using parameterization type Euler Angles");
 
   // Converting from a rotation matrix to an intrinsic XYZ euler angles have 2 singularities:
   // pitch ~= pi/2 ==> roll + yaw = theta
@@ -677,7 +697,7 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
   // in those cases CalcEulerAngles will set roll (xyz(0)) to theta and yaw (xyz(2)) to zero, so for us to be able to
   // capture yaw tolerance violation we do the following, if theta violate the absolute yaw tolerance we think of it as
   // pure yaw rotation and set roll to zero
-  auto& xyz = std::get<Eigen::Vector3d>(euler_angles_error);
+  xyz = std::get<Eigen::Vector3d>(euler_angles_error);
   if (!std::get<bool>(euler_angles_error))
   {
     if (normalizeAbsoluteAngle(xyz(0)) > absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon())
@@ -686,9 +706,26 @@ ConstraintEvaluationResult OrientationConstraint::decide(const moveit::core::Rob
       xyz(0) = 0;
     }
   }
-  // Account for angle wrapping
-  xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
 
+    // Account for angle wrapping
+    xyz = xyz.unaryExpr(&normalizeAbsoluteAngle);
+  }
+  else if (parameterization_ == moveit_msgs::OrientationConstraint::ROTATION_VECTOR)
+  {
+    // ROS_INFO_NAMED("kinematic_constraints", "Using parameterization type Angle-Axis");
+    Eigen::AngleAxisd angle_axis(diff.linear());
+    xyz = angle_axis.axis() * angle_axis.angle();
+    xyz(0) = fabs(xyz(0));
+    xyz(1) = fabs(xyz(1));
+    xyz(2) = fabs(xyz(2));
+  }
+  else
+  {
+    /* The parameterization type should be validated in configure, so this should never happen. */
+    ROS_ERROR_STREAM_NAMED("kinematic_constraints",
+                           "The parameterization type for the orientation constraints is invalid.");
+  }
+  
   // 0,1,2 corresponds to XYZ, the convention used in sampling constraints
   bool result = xyz(2) < absolute_z_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
                 xyz(1) < absolute_y_axis_tolerance_ + std::numeric_limits<double>::epsilon() &&
