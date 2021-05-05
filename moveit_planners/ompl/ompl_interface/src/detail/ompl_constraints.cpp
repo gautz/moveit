@@ -143,17 +143,17 @@ void BaseConstraint::function(const Eigen::Ref<const Eigen::VectorXd>& joint_val
   out = bounds_.penalty(current_values);
 }
 
-// void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
-//                               Eigen::Ref<Eigen::MatrixXd> out) const
-// {
-//   Eigen::VectorXd constraint_error = calcError(joint_values);
-//   Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
-//   Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
-//   for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
-//   {
-//     out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
-//   }
-// }
+void BaseConstraint::jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values,
+                              Eigen::Ref<Eigen::MatrixXd> out) const
+{
+  Eigen::VectorXd constraint_error = calcError(joint_values);
+  Eigen::VectorXd constraint_derivative = bounds_.derivative(constraint_error);
+  Eigen::MatrixXd robot_jacobian = calcErrorJacobian(joint_values);
+  for (std::size_t i{ 0 }; i < bounds_.size(); ++i)
+  {
+    out.row(i) = constraint_derivative[i] * robot_jacobian.row(i);
+  }
+}
 
 /******************************************
  * Position constraints
@@ -188,10 +188,10 @@ Eigen::VectorXd BoxConstraint::calcError(const Eigen::Ref<const Eigen::VectorXd>
   return target_orientation_.matrix().transpose() * (forwardKinematics(x).translation() - target_position_);
 }
 
-// Eigen::MatrixXd BoxConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
-// {
-//   return target_orientation_.matrix().transpose() * robotGeometricJacobian(x).topRows(3);
-// }
+Eigen::MatrixXd BoxConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
+{
+  return target_orientation_.matrix().transpose() * robotGeometricJacobian(x).topRows(3);
+}
 
 /******************************************
  * Equality constraints
@@ -310,12 +310,12 @@ Eigen::VectorXd OrientationConstraint::calcError(const Eigen::Ref<const Eigen::V
   return aa.axis() * aa.angle();
 }
 
-// Eigen::MatrixXd OrientationConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
-// {
-//   Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
-//   Eigen::AngleAxisd aa{ orientation_difference };
-//   return -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
-// }
+Eigen::MatrixXd OrientationConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
+{
+  Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
+  Eigen::AngleAxisd aa{ orientation_difference };
+  return -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
+}
 
 // /******************************************
 //  * Position equality and Orientation box constraints
@@ -445,14 +445,11 @@ void BoxPoseConstraint::parseConstraintMsg(const moveit_msgs::Constraints& const
       constraints.position_constraints.at(0).constraint_region.primitive_poses.at(0).position;
   target_position_ << position.x, position.y, position.z;
 
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Parsing Orientation constraints for OMPL constrained state space.");
+  ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsing Orientation constraints for OMPL constrained state space.");
   // assert(bounds_.size() == 0);
   Bounds bounds_ori = orientationConstraintMsgToBoundVector(constraints.orientation_constraints.at(0));
-  ROS_INFO_NAMED(LOGNAME, "Parsed Orientation constraints");
-  ROS_INFO_STREAM_NAMED(LOGNAME,  bounds_);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rx / roll constraints" << bounds_[0]);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed ry / pitch constraints" << bounds_[1]);
-  // ROS_DEBUG_STREAM_NAMED(LOGNAME, "Parsed rz / yaw constraints" << bounds_[2]);
+  ROS_DEBUG_NAMED(LOGNAME, "Parsed Orientation constraints");
+  ROS_DEBUG_STREAM_NAMED(LOGNAME,  bounds_);
 
   // extract target position and orientation
   // geometry_msgs::Point position =
@@ -486,7 +483,6 @@ void BoxPoseConstraint::parseConstraintMsg(const moveit_msgs::Constraints& const
 
 Eigen::VectorXd BoxPoseConstraint::calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const
 {
-  // Eigen::Matrix<double, 5, 1> error;
   Eigen::Vector3d error_pos;
   error_pos = target_orientation_.matrix().transpose() * (forwardKinematics(x).translation() - target_position_);
   
@@ -498,22 +494,25 @@ Eigen::VectorXd BoxPoseConstraint::calcError(const Eigen::Ref<const Eigen::Vecto
   // error[4] = (aa.axis()[0] * aa.angle());
   // error.push_back(aa.axis()[0] * aa.angle()[0]);
   // error.push_back(aa.axis()[1] * aa.angle()[1]);
-  // ROS_INFO_STREAM_NAMED(LOGNAME,  error_pos);
-  // ROS_INFO_STREAM_NAMED(LOGNAME,  error_ori);
+
   Eigen::VectorXd error = Eigen::VectorXd(6);
-  error << error_pos, error_ori;
   // Eigen::VectorXd error = Eigen::VectorXd(5);
   // error << error_pos, error_ori[0], error_ori[1];
-  return error;
+  return error_pos, error_ori;
 }
 
-// Eigen::MatrixXd BoxPoseConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
-// {
-//   target_orientation_.matrix().transpose() * robotGeometricJacobian(x).topRows(3);
-//   Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
-//   Eigen::AngleAxisd aa{ orientation_difference };
-//   return -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
-// }
+Eigen::MatrixXd BoxPoseConstraint::calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const
+{
+  Eigen::MatrixXd positionErrorJacobian = target_orientation_.matrix().transpose() * robotGeometricJacobian(x).topRows(3);
+
+  Eigen::Matrix3d orientation_difference = forwardKinematics(x).linear().transpose() * target_orientation_;
+  Eigen::AngleAxisd aa{ orientation_difference };
+  Eigen::MatrixXd orientationErrorJacobian = -angularVelocityToAngleAxis(aa.angle(), aa.axis()) * robotGeometricJacobian(x).bottomRows(3);
+  Eigen::MatrixXd poseErrorJacobian = Eigen::MatrixXd(positionErrorJacobian.rows()+orientationErrorJacobian.rows(),positionErrorJacobian.cols());
+
+  poseErrorJacobian << positionErrorJacobian, orientationErrorJacobian;
+  return poseErrorJacobian;
+}
 
 /************************************
  * MoveIt constraint message parsing

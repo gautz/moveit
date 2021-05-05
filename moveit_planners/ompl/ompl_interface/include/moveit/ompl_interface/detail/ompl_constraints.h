@@ -154,7 +154,7 @@ public:
    * Optionally you can also provide dF(q)/dq, the Jacobian of  the constraint.
    *
    * */
-  // void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
+  void jacobian(const Eigen::Ref<const Eigen::VectorXd>& joint_values, Eigen::Ref<Eigen::MatrixXd> out) const override;
 
   /** \brief Wrapper for forward kinematics calculated by MoveIt's Robot State.
    *
@@ -281,7 +281,7 @@ public:
                 const unsigned int num_dofs);
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
 };
 
 /******************************************
@@ -367,7 +367,7 @@ public:
 
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
 };
 
 // /******************************************
@@ -411,7 +411,7 @@ public:
 
   void parseConstraintMsg(const moveit_msgs::Constraints& constraints) override;
   Eigen::VectorXd calcError(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
-  // Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
+  Eigen::MatrixXd calcErrorJacobian(const Eigen::Ref<const Eigen::VectorXd>& x) const override;
 
 };
 
