@@ -590,10 +590,10 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
   out[2] = 0.0;  // unbounded dimension
   }
   else if(knot_number_>3) {
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);
+  ROS_ERROR_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);
   }
   else{
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraints require at least 2 knots. Number of knots given: " << knot_number_);
+  ROS_ERROR_STREAM_NAMED(LOGNAME, "Linear system constraints require at least 2 knots. Number of knots given: " << knot_number_);
   }
 }
 
@@ -638,13 +638,13 @@ void LinearSystemPositionConstraint::jacobian(const Eigen::Ref<const Eigen::Vect
   }
   else if(knot_number_==3) // The position is contrained on a circle passing through 3 points
   {
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Jacobian currently not available for Circle constraints");
+  // ROS_ERROR_STREAM_NAMED(LOGNAME, "Jacobian currently not available for Circle constraints");
   }
   else if(knot_number_>3) {
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);
+  ROS_ERROR_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);
   }
   else{
-  ROS_INFO_STREAM_NAMED(LOGNAME, "Linear system constraints require at least 2 knots. Number of knots given: " << knot_number_);
+  ROS_ERROR_STREAM_NAMED(LOGNAME, "Linear system constraints require at least 2 knots. Number of knots given: " << knot_number_);
   }
 }
 
