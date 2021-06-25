@@ -69,6 +69,8 @@
 
 #include <ompl/base/ConstrainedSpaceInformation.h>
 #include <ompl/base/spaces/constraint/ProjectedStateSpace.h>
+#include <ompl/base/spaces/constraint/TangentBundleStateSpace.h>
+#include <ompl/base/spaces/constraint/AtlasStateSpace.h>
 
 #include <moveit/ompl_interface/parameterization/joint_space/joint_model_state_space_factory.h>
 #include <moveit/ompl_interface/parameterization/joint_space/joint_model_state_space.h>
@@ -358,11 +360,34 @@ ompl_interface::ModelBasedPlanningContextPtr ompl_interface::PlanningContextMana
       ompl::base::ConstraintPtr ompl_constraint =
           ompl_interface::createOMPLConstraint(robot_model_, config.group, req.path_constraints);
 
-      // Create a constrained state space of type "projected state space".
       // Other types are available, so we probably should add another setting to ompl_planning.yaml
       // to choose between them.
+  //     const std::map<std::string, std::string>& config = config.config;
+  // if (config.empty())
+  //   return;
+  std::map<std::string, std::string> cfg = config.config;
+  auto it = cfg.find("constrained_state_space");
+    if (it != cfg.end())
+  {    
+if (it->second == "TangentBundleStateSpace")
+{
+      context_spec.constrained_state_space_ =
+          std::make_shared<ob::TangentBundleStateSpace>(context_spec.state_space_, ompl_constraint);
+  ROS_INFO_NAMED("planning_context_manager", "Created a constrained state space of type: tangent bundle state space.");
+}
+else if (it->second == "AtlasStateSpace")
+{
+      context_spec.constrained_state_space_ =
+          std::make_shared<ob::AtlasStateSpace>(context_spec.state_space_, ompl_constraint);
+  ROS_INFO_NAMED("planning_context_manager", "Created a constrained state space of type: atlas state space.");
+}}
+else // ProjectedStateSpace
+{
+      // Create a constrained state space of type "projected state space".
       context_spec.constrained_state_space_ =
           std::make_shared<ob::ProjectedStateSpace>(context_spec.state_space_, ompl_constraint);
+  ROS_INFO_NAMED("planning_context_manager", "Created a constrained state space of type: projected state space.");
+}
 
       // Pass the constrained state space to ompl simple setup through the creation of a
       // ConstrainedSpaceInformation object. This makes sure the state space is properly initialized.
@@ -524,6 +549,8 @@ ompl_interface::ModelBasedPlanningContextPtr ompl_interface::PlanningContextMana
   // in JointModelStateSpace.
   StateSpaceFactoryTypeSelector factory_selector;
   auto constrained_planning_iterator = pc->second.config.find("enforce_constrained_state_space");
+  // constrained_state_space_type_iterator_ = pc->second.config.find("constrained_state_space");
+// constrained_state_space_type_ = constrained_state_space_type_iterator->second;
   auto joint_space_planning_iterator = pc->second.config.find("enforce_joint_model_state_space");
 
   if (constrained_planning_iterator != pc->second.config.end() &&

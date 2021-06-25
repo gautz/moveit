@@ -207,6 +207,8 @@ public:
 
 protected:
   typedef std::function<const ModelBasedStateSpaceFactoryPtr&(const std::string&)> StateSpaceFactoryTypeSelector;
+  // ros::M_string::const_iterator constrained_state_space_type_iterator_ ;
+  // std::string constrained_state_space_type_;
 
   ConfiguredPlannerAllocator plannerSelector(const std::string& planner) const;
 

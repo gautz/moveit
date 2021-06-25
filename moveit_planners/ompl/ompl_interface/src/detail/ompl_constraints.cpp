@@ -543,7 +543,7 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
   out[1] = (end_position_.z() - start_position_.z())*(cartesianPosition.x() - start_position_.x())-(end_position_.x() - start_position_.x())*(cartesianPosition.z() - start_position_.z());
   // (xb-xa)(y-ya)-(yb-ya)(x-xa)=0
   // residual[2] = (end_position_.x() - start_position_.x())*(cartesianPosition.y() - start_position_.y())-(end_position_.y() - start_position_.y())*(cartesianPosition.x() - start_position_.x());
-  out[2]=0.0;
+  // out[2]=0.0;
   // for (std::size_t dim{ 0 }; dim < 3; ++dim)
   // {
   //   if (is_dim_constrained_[dim])
@@ -587,7 +587,7 @@ void LinearSystemPositionConstraint::function(const Eigen::Ref<const Eigen::Vect
   // // ROS_INFO_STREAM_NAMED(LOGNAME, "Residual of the start position " << residual);
 
   // center_position_ =center_position;
-  out[2] = 0.0;  // unbounded dimension
+  // out[2] = 0.0;  // unbounded dimension
   }
   else if(knot_number_>3) {
   ROS_ERROR_STREAM_NAMED(LOGNAME, "Splines are currently not supported. Number of knots given: " << knot_number_);

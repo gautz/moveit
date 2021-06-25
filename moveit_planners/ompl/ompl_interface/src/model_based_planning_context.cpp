@@ -49,11 +49,15 @@
 #include <moveit/profiler/profiler.h>
 #include <moveit/utils/lexical_casts.h>
 
+#include <moveit_msgs/Constraints.h>
+
 #include <ompl/config.h>
 #include <ompl/base/samplers/UniformValidStateSampler.h>
 #include <ompl/base/goals/GoalLazySamples.h>
 #include <ompl/tools/config/SelfConfig.h>
 #include <ompl/base/spaces/SE3StateSpace.h>
+#include <ompl/base/spaces/constraint/AtlasStateSpace.h>
+#include <ompl/base/spaces/constraint/TangentBundleStateSpace.h>
 #include <ompl/datastructures/PDF.h>
 // TODO: remove when ROS Melodic and older are no longer supported
 #if OMPL_VERSION_VALUE < 1005000
@@ -120,11 +124,49 @@ void ompl_interface::ModelBasedPlanningContext::configure(const ros::NodeHandle&
   if (spec_.constrained_state_space_)
   {
     // convert the input state to the corresponding OMPL state
-    ompl::base::ScopedState<> ompl_start_state(spec_.constrained_state_space_);
+    ob::ScopedState<> ompl_start_state(spec_.constrained_state_space_);
     spec_.state_space_->copyToOMPLState(ompl_start_state.get(), getCompleteInitialRobotState());
     ompl_simple_setup_->setStartState(ompl_start_state);
     ompl_simple_setup_->setStateValidityChecker(
         ob::StateValidityCheckerPtr(std::make_shared<ConstrainedPlanningStateValidityChecker>(this)));
+    ROS_INFO_STREAM("start state from getCompleteInitialRobotState: " << getCompleteInitialRobotState());
+
+    std::map<std::string, std::string> cfg = getSpecificationConfig();
+    auto it = cfg.find("constrained_state_space");
+    if (it != cfg.end())
+    {
+      // extract joint state goal from planning request
+      // auto constraints = request_.goal_constraints[0];
+      // ROS_INFO_STREAM("goal constraints from planning request: " << constraints);
+
+      // ob::ScopedState<> goal(spec_.constrained_state_space_);
+      // goal->as<ob::ConstrainedStateSpace::StateType>()->copy(goal_joint_positions);
+      // ROS_INFO_STREAM("goal reconstructed from planning request: " << goal);
+
+      // for Atlas and TangentBundle, the start and goal states have to be anchored.
+      if (it->second == "TangentBundleStateSpace")
+      {
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "trying to anchor start states for constrained tangent bundle state space.");
+        spec_.constrained_state_space_->as<ob::TangentBundleStateSpace>()->anchorChart(ompl_start_state.get());
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "trying to anchor goal states for constrained tangent bundle state space.");
+        // spec_.constrained_state_space_->as<ob::TangentBundleStateSpace>()->anchorChart(goal.get());
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "start and goal states anchored for constrained tangent bundle state space.");
+      }
+      else if (it->second == "AtlasStateSpace")
+      {
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "trying to anchor start states for constrained atlas state space.");
+        spec_.constrained_state_space_->as<ob::AtlasStateSpace>()->anchorChart(ompl_start_state.get());
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "trying to anchor goal states for constrained atlas state space.");
+        // spec_.constrained_state_space_->as<ob::AtlasStateSpace>()->anchorChart(goal.get());
+        ROS_INFO_NAMED("model_based_planning_context",
+                       "start and goal states anchored for constrained atlas state space.");
+      }
+    }
   }
   else
   {
@@ -133,6 +175,7 @@ void ompl_interface::ModelBasedPlanningContext::configure(const ros::NodeHandle&
     spec_.state_space_->copyToOMPLState(ompl_start_state.get(), getCompleteInitialRobotState());
     ompl_simple_setup_->setStartState(ompl_start_state);
     ompl_simple_setup_->setStateValidityChecker(std::make_shared<StateValidityChecker>(this));
+    ROS_INFO_NAMED("model_based_planning_context", "start and goal states not anchored.");
   }
 
   if (path_constraints_ && constraints_library_)
